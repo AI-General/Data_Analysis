@@ -1,3 +1,5 @@
+pysqlite3-binary
 openpyxl
 pandas
 pinecone-client
+chromadb

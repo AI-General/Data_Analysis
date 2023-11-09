@@ -16,7 +16,7 @@ try:
     pinecone.delete_index(PINECONE_INDEX_NAME)
 except Exception as e:
     print(e)
-pinecone.create_index(PINECONE_INDEX_NAME, dimension=1000)
+pinecone.create_index(PINECONE_INDEX_NAME, dimension=1000, pod_type='s1')
 pinecone.describe_index(PINECONE_INDEX_NAME)
     
 df = pd.read_excel('data/DATASET_MASTER.xlsx')

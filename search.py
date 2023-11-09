@@ -1,8 +1,11 @@
 import os
 import dotenv
+import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import pinecone
+
+matplotlib.use('Agg') 
 
 dotenv.load_dotenv()
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -47,6 +50,8 @@ text = "Time: From " + str(df['DATE'][int(result['matches'][0]['id'])]) + " " + 
 
 
 plt.show()
+plt.savefig('my_figure.png')
+
 
 # dataset_df = pd.read_excel('data/DATASET_MASTER.xlsx')
 

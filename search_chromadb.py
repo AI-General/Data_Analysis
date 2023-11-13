@@ -24,7 +24,7 @@ if sample_value[0] == None:
     sample_value[0] = 0
 
 for i in range(1, 1000):
-    if sample_value == None:
+    if np.isnan(sample_value[i]):
         sample_value[i] = sample_value[i-1]
 
 results = collection.query(

@@ -47,10 +47,13 @@ def plot_from_xlsx(file_path):
     window = results['metadatas'][0][0]['window']
 
     embedding = dataset_df['VALUE'][id:id+window].tolist()
+    embedding_mean = np.mean(embedding)
+    embedding_norm = np.linalg.norm(embedding - embedding_mean)
     sample = resample(sample_value, window)
+    sample = sample - np.mean(sample)
 
     # nor_embedding = np.array(embedding)/np.linalg.norm(np.array(embedding))
-    scaled_sample = np.array(sample)/np.linalg.norm(np.array(sample))*np.linalg.norm(np.array(embedding))
+    scaled_sample = sample/np.linalg.norm(sample)*embedding_norm + embedding_mean
     
     start = max(0, id - window)
     end = min(len(dataset_df['VALUE']), id + window * 2)

@@ -50,7 +50,7 @@ def upsert_vectors_k(collection, df, batch_size=100, window=1000, divide=16):
     step = int(window // divide)
     data_generator = map(lambda i: {
         'id': str(df.index[i]),
-        'value': list(resample(df['VALUE'][i:i+window].tolist(), 1000)),
+        'value': list(resample(df['VALUE'][i:i+window].tolist() - np.mean(df['VALUE'][i:i+window].tolist()), 1000)),
         'metadata': {
             'ID': int(df['ID'][i]),
             'date': str(df['DATE'][i]),

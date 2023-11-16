@@ -1,4 +1,7 @@
 # DATA_ANALYSIS_PYTHON
+<div align="center">
+    <img src="./output.png" alt="ExpertGPT-logo" width="100%"  style="border-radius: 0%; padding-bottom: 20px"/>
+</div>
 
 ## Install requirements
 ```bash
@@ -12,14 +15,12 @@ cp .env.example .env
 
 ## Regist Data
 ```bash
-python3 regist_chromadb.py
+python3 regist_chromadb_scaled.py
 ```
 This command make `DB` directory and regist from `data\DATASET_MASTER.xlsx`
 
-## Search
+## Running Gradio Server
 ```bash
-python3 search_chromadb.py
+gradio interface.py
 ```
-This command search most similar recode with `data\SAMPLE_DATASET.xlsx`
-And print `distance` and `Start time`
-and plot graph of `sample` and `searched result` records
+

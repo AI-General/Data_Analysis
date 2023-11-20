@@ -50,6 +50,8 @@ def plot_from_xlsx(file_path):
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
     sample = resample(sample_value, window)
+    sample[0] = sample_value[0]
+    sample[-1] = sample_value[-1]
     sample = sample - np.mean(sample)
 
     # nor_embedding = np.array(embedding)/np.linalg.norm(np.array(embedding))

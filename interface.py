@@ -28,17 +28,24 @@ def plot_from_xlsx(file_path):
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
     # sample_data = sample_df.values.tolist()
     sample_value = sample_df[sample_df.columns[1]].tolist()
-    assert len(sample_value) == 1000
+    # assert len(sample_value) == 1000
 
     if sample_value[0] == None:
         sample_value[0] = 0
 
-    for i in range(1, 1000):
+    for i in range(1, len(sample_value)):
         if np.isnan(sample_value[i]):
             sample_value[i] = sample_value[i-1]
     
+    reflected_signal = np.concatenate((sample_value[::-1], sample_value, sample_value[::-1]))
+    resampled_reflected_signal = resample(reflected_signal, 3 * 1000)
+    sample_value_scaled = list(resampled_reflected_signal[1000:2000])
+    
+    # sample_value_scaled[0] = sample_value[0]
+    # sample_value_scaled[-1] = sample_value[-1]
+    
     results = collection.query(
-        query_embeddings=[sample_value],
+        query_embeddings=[sample_value_scaled],
         n_results=1
     )
     
@@ -49,9 +56,12 @@ def plot_from_xlsx(file_path):
     embedding = dataset_df['VALUE'][id:id+window].tolist()
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
-    sample = resample(sample_value, window)
-    sample[0] = sample_value[0]
-    sample[-1] = sample_value[-1]
+    
+    resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
+    sample = resampled_window_reflected_signal[window:2*window]
+    # sample = resample(sample_value, window)
+    # sample[0] = sample_value[0]
+    # sample[-1] = sample_value[-1]
     sample = sample - np.mean(sample)
 
     # nor_embedding = np.array(embedding)/np.linalg.norm(np.array(embedding))

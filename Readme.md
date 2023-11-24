@@ -1,6 +1,6 @@
 # DATA_ANALYSIS_PYTHON
 <div align="center">
-    <img src="./output.png" alt="ExpertGPT-logo" width="100%"  style="border-radius: 0%; padding-bottom: 20px"/>
+    <img src="./sample.png" alt="ExpertGPT-logo" width="100%"  style="border-radius: 0%; padding-bottom: 20px"/>
 </div>
 
 ## Install requirements

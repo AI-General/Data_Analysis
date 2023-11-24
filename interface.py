@@ -22,6 +22,70 @@ print("Data loaded")
 dataset_df['Datetime'] = pd.to_datetime(dataset_df['DATE'].astype(str) + ' ' + dataset_df['TIME'].astype(str))
 dataset_df = dataset_df.set_index('Datetime')
 
+
+def process(dataset_df, reflected_signal, id, distance, window, output_path):
+    embedding = dataset_df['VALUE'][id:id+window].tolist()
+    embedding_mean = np.mean(embedding)
+    embedding_norm = np.linalg.norm(embedding - embedding_mean)
+
+    resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
+    sample = resampled_window_reflected_signal[window:2*window]
+    
+    resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
+    sample = resampled_window_reflected_signal[window:2*window]
+    sample = sample - np.mean(sample)
+    
+    scaled_sample = sample/np.linalg.norm(sample)*embedding_norm + embedding_mean
+    
+    start = max(0, id - window)
+    end = min(len(dataset_df['VALUE']), id + window * 2)
+    
+    plt.figure(figsize=(18, 6))
+    plt.plot(np.arange(start, end), dataset_df['VALUE'][start:end], color='blue', label='Search Result')
+    plt.plot(np.arange(id, id+window), scaled_sample, color='red', label='Recaled Sample')
+    plt.title("Most relevant search result")
+    plt.xlabel("ID")
+    plt.ylabel("Value")
+    plt.legend()
+    
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    
+    # Saving to a temporary file and return its path
+    plt.savefig(output_path)
+    plt.close()
+    return text, output_path 
+
+
+def process_80(dataset_df, reflected_signal, id, distance, window, output_path):
+    embedding = dataset_df['VALUE'][id:id+window].tolist()
+    embedding_mean = np.mean(embedding)
+    embedding_norm = np.linalg.norm(embedding - embedding_mean)
+
+    resampled_window_reflected_signal = resample(reflected_signal, 3*int(5/4*window))
+    sample = resampled_window_reflected_signal[int(5*window/4) : 2*int(5*window/4)]
+    
+    sample = sample - np.mean(sample[:window])
+    scaled_sample = sample/np.linalg.norm(sample[:window])*embedding_norm + embedding_mean 
+    
+    start = max(0, id - window)
+    end = min(len(dataset_df['VALUE']), id + int(window * 5 / 2))
+    
+    plt.figure(figsize=(18, 6))
+    plt.plot(np.arange(start, end), dataset_df['VALUE'][start:end], color='blue', label='Search Result')
+    plt.plot(np.arange(id, id+window), scaled_sample[:window], color='red', label='Recaled Sample')
+    plt.plot(np.arange(id+window, id+int(window * 5 / 4)), scaled_sample[window:int(window * 5 / 4)], color='green', label='Recaled Sample')
+    plt.title("Most relevant search result")
+    plt.xlabel("ID")
+    plt.ylabel("Value")
+    plt.legend()
+    
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    
+    plt.savefig(output_path)
+    plt.close()
+    
+    return text, output_path
+
 # This function will be called when the user uploads an xlsx file
 def plot_from_xlsx(file_path):
     # Read the xlsx file with pandas
@@ -40,54 +104,80 @@ def plot_from_xlsx(file_path):
     reflected_signal = np.concatenate((sample_value[::-1], sample_value, sample_value[::-1]))
     resampled_reflected_signal = resample(reflected_signal, 3 * 1000)
     sample_value_scaled = list(resampled_reflected_signal[1000:2000])
-    
-    # sample_value_scaled[0] = sample_value[0]
-    # sample_value_scaled[-1] = sample_value[-1]
-    
+
     results = collection.query(
         query_embeddings=[sample_value_scaled],
-        n_results=1
+        n_results=3
     )
     
-    id = int(results['metadatas'][0][0]['ID'])
-    distance = results['distances'][0][0]
-    window = results['metadatas'][0][0]['window']
+    text0, path0 = process(
+            dataset_df=dataset_df, 
+            reflected_signal=reflected_signal, 
+            id=int(results['metadatas'][0][0]['ID']), 
+            distance=results['distances'][0][0], 
+            window=results['metadatas'][0][0]['window'], 
+            output_path='image/my_figure0.png'
+        )
+    
+    text1, path1 = process(
+            dataset_df=dataset_df,
+            reflected_signal=reflected_signal,
+            id=int(results['metadatas'][0][1]['ID']),
+            distance=results['distances'][0][1],
+            window=results['metadatas'][0][1]['window'],
+            output_path='image/my_figure1.png'
+    )
+    
+    text2, path2 = process(
+            dataset_df=dataset_df,
+            reflected_signal=reflected_signal,
+            id=int(results['metadatas'][0][2]['ID']),
+            distance=results['distances'][0][2],
+            window=results['metadatas'][0][2]['window'],
+            output_path='image/my_figure2.png'
+    )
+    
+    return text0, path0, text1, path1, text2, path2
 
-    embedding = dataset_df['VALUE'][id:id+window].tolist()
-    embedding_mean = np.mean(embedding)
-    embedding_norm = np.linalg.norm(embedding - embedding_mean)
-    
-    resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
-    sample = resampled_window_reflected_signal[window:2*window]
-    # sample = resample(sample_value, window)
-    # sample[0] = sample_value[0]
-    # sample[-1] = sample_value[-1]
-    sample = sample - np.mean(sample)
+    # id = int(results['metadatas'][0][0]['ID'])
+    # distance = results['distances'][0][0]
+    # window = results['metadatas'][0][0]['window']
 
-    # nor_embedding = np.array(embedding)/np.linalg.norm(np.array(embedding))
-    scaled_sample = sample/np.linalg.norm(sample)*embedding_norm + embedding_mean
+    # embedding = dataset_df['VALUE'][id:id+window].tolist()
+    # embedding_mean = np.mean(embedding)
+    # embedding_norm = np.linalg.norm(embedding - embedding_mean)
     
-    start = max(0, id - window)
-    end = min(len(dataset_df['VALUE']), id + window * 2)
+    # resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
+    # sample = resampled_window_reflected_signal[window:2*window]
+    # # sample = resample(sample_value, window)
+    # # sample[0] = sample_value[0]
+    # # sample[-1] = sample_value[-1]
+    # sample = sample - np.mean(sample)
 
-    plt.figure(figsize=(18, 6))
-    plt.plot(np.arange(start, end), dataset_df['VALUE'][start:end], color='blue', label='Search Result')
-    plt.plot(np.arange(id, id+window), scaled_sample, color='red', label='Recaled Sample')
-    plt.title("Most relevant search result")
-    plt.xlabel("ID")
-    plt.ylabel("Value")
-    plt.legend()
+    # # nor_embedding = np.array(embedding)/np.linalg.norm(np.array(embedding))
+    # scaled_sample = sample/np.linalg.norm(sample)*embedding_norm + embedding_mean
     
-    print("Distance score: ", distance)
-    print("Start Datetime: ", dataset_df.index[id])
-    print("End Datetime: ", dataset_df.index[id+window])
+    # start = max(0, id - window)
+    # end = min(len(dataset_df['VALUE']), id + window * 2)
+
+    # plt.figure(figsize=(18, 6))
+    # plt.plot(np.arange(start, end), dataset_df['VALUE'][start:end], color='blue', label='Search Result')
+    # plt.plot(np.arange(id, id+window), scaled_sample, color='red', label='Recaled Sample')
+    # plt.title("Most relevant search result")
+    # plt.xlabel("ID")
+    # plt.ylabel("Value")
+    # plt.legend()
     
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    # print("Distance score: ", distance)
+    # print("Start Datetime: ", dataset_df.index[id])
+    # print("End Datetime: ", dataset_df.index[id+window])
     
-    # Saving to a temporary file and return its path
-    plt.savefig('output.png')
-    plt.close()
-    return text, 'output.png'  
+    # text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    
+    # # Saving to a temporary file and return its path
+    # plt.savefig('output.png')
+    # plt.close()
+    # return text, 'output.png'  
 
 def plot_from_xlsx_80(file_path):
     # Read the xlsx file with pandas
@@ -112,51 +202,79 @@ def plot_from_xlsx_80(file_path):
     
     results = collection.query(
         query_embeddings=[sample_value_scaled[:1000]],
-        n_results=1
+        n_results=3
     )
     
-    id = int(results['metadatas'][0][0]['ID'])
-    distance = results['distances'][0][0]
-    window = results['metadatas'][0][0]['window']
+    text0, path0 = process_80(
+            dataset_df=dataset_df,
+            reflected_signal=reflected_signal,
+            id=int(results['metadatas'][0][0]['ID']),
+            distance=results['distances'][0][0],
+            window=results['metadatas'][0][0]['window'],
+            output_path='image/my_figure0_80.png'
+    )
+    
+    text1, path1 = process_80(
+            dataset_df=dataset_df,
+            reflected_signal=reflected_signal,
+            id=int(results['metadatas'][0][1]['ID']),
+            distance=results['distances'][0][1],
+            window=results['metadatas'][0][1]['window'],
+            output_path='image/my_figure1_80.png'
+    )
+    
+    text2, path2 = process_80(
+            dataset_df=dataset_df,
+            reflected_signal=reflected_signal,
+            id=int(results['metadatas'][0][2]['ID']),
+            distance=results['distances'][0][2],
+            window=results['metadatas'][0][2]['window'],
+            output_path='image/my_figure2_80.png'
+    )
+    
+    return text0, path0, text1, path1, text2, path2
+    
+    # id = int(results['metadatas'][0][0]['ID'])
+    # distance = results['distances'][0][0]
+    # window = results['metadatas'][0][0]['window']
 
-    embedding = dataset_df['VALUE'][id:id+window].tolist()
-    embedding_mean = np.mean(embedding)
-    embedding_norm = np.linalg.norm(embedding - embedding_mean)
+    # embedding = dataset_df['VALUE'][id:id+window].tolist()
+    # embedding_mean = np.mean(embedding)
+    # embedding_norm = np.linalg.norm(embedding - embedding_mean)
     
-    resampled_window_reflected_signal = resample(reflected_signal, int(3 * 5 / 4 * window))
-    sample = resampled_window_reflected_signal[int(5*window/4):2*int(5*window/4)]
-    # sample = resample(sample_value, window)
-    # sample[0] = sample_value[0]
-    # sample[-1] = sample_value[-1]
-    sample = sample - np.mean(sample[:window])
+    # resampled_window_reflected_signal = resample(reflected_signal, int(3 * 5 / 4 * window))
+    # sample = resampled_window_reflected_signal[int(5*window/4):2*int(5*window/4)]
+    # # sample = resample(sample_value, window)
+    # # sample[0] = sample_value[0]
+    # # sample[-1] = sample_value[-1]
+    # sample = sample - np.mean(sample[:window])
 
-    # nor_embedding = np.array(embedding)/np.linalg.norm(np.array(embedding))
-    scaled_sample = sample/np.linalg.norm(sample[:window])*embedding_norm + embedding_mean
+    # # nor_embedding = np.array(embedding)/np.linalg.norm(np.array(embedding))
+    # scaled_sample = sample/np.linalg.norm(sample[:window])*embedding_norm + embedding_mean    
     
-    
-    start = max(0, id - window)
-    end = min(len(dataset_df['VALUE']), id + int(window * 5 / 2))
+    # start = max(0, id - window)
+    # end = min(len(dataset_df['VALUE']), id + int(window * 5 / 2))
 
-    plt.figure(figsize=(18, 6))
-    plt.plot(np.arange(start, end), dataset_df['VALUE'][start:end], color='blue', label='Search Result')
-    plt.plot(np.arange(id, id+window), scaled_sample[:window], color='red', label='Recaled Sample')
-    plt.plot(np.arange(id+window, id+int(window * 5 / 4)), scaled_sample[window:int(window * 5 / 4)], color='green', label='Recaled Sample')
-    plt.title("Most relevant search result")
-    plt.xlabel("ID")
-    plt.ylabel("Value")
-    plt.legend()
+    # plt.figure(figsize=(18, 6))
+    # plt.plot(np.arange(start, end), dataset_df['VALUE'][start:end], color='blue', label='Search Result')
+    # plt.plot(np.arange(id, id+window), scaled_sample[:window], color='red', label='Recaled Sample')
+    # plt.plot(np.arange(id+window, id+int(window * 5 / 4)), scaled_sample[window:int(window * 5 / 4)], color='green', label='Recaled Sample')
+    # plt.title("Most relevant search result")
+    # plt.xlabel("ID")
+    # plt.ylabel("Value")
+    # plt.legend()
     
-    print("Distance score: ", distance)
-    print("Start Datetime: ", dataset_df.index[id])
-    print("Middle Datetime: ", dataset_df.index[id+window])
-    print("End Datetime: ", dataset_df.index[id+int(window * 5 / 2)])
+    # print("Distance score: ", distance)
+    # print("Start Datetime: ", dataset_df.index[id])
+    # print("Middle Datetime: ", dataset_df.index[id+window])
+    # print("End Datetime: ", dataset_df.index[id+int(window * 5 / 2)])
     
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    # text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
     
-    # Saving to a temporary file and return its path
-    plt.savefig('output_80.png')
-    plt.close()
-    return text, 'output_80.png'  
+    # # Saving to a temporary file and return its path
+    # plt.savefig('output_80.png')
+    # plt.close()
+    # return text, 'output_80.png', text, 'output_80.png', text, 'output_80.png'
 
 # Create a File input component on the interface
 
@@ -165,19 +283,33 @@ with gr.Blocks() as demo:
     with gr.Tab("Full Search"):
         file_input = gr.File(type="filepath")
 
-        text_field = gr.Textbox(label="Result")
+        text_field0 = gr.Textbox(label="Result0")
+        text_field1 = gr.Textbox(label="Result1")
+        text_field2 = gr.Textbox(label="Result2")
+        
+        image_field0 = gr.Image(label="Result0")
+        image_field1 = gr.Image(label="Result1")
+        image_field2 = gr.Image(label="Result2")
 
         # Create the interface with the input and output components
-        iface = gr.Interface(fn=plot_from_xlsx, inputs=file_input, outputs=[text_field, "image"])
+        iface = gr.Interface(fn=plot_from_xlsx, inputs=file_input, outputs=[text_field0, image_field0, text_field1, image_field1, text_field2, image_field2])
         # iface.render()
     
     with gr.Tab("80% Search"):
         file_input_80 = gr.File(type="filepath")
 
-        text_field_80 = gr.Textbox(label="Result")        
-        iface_80 = gr.Interface(fn=plot_from_xlsx_80, inputs=file_input_80, outputs=[text_field_80, "image"])
+        text_field0_80 = gr.Textbox(label="Result0")
+        text_field1_80 = gr.Textbox(label="Result1") 
+        text_field2_80 = gr.Textbox(label="Result2")
+        
+        image_field0_80 = gr.Image(label="Result0")
+        image_field1_80 = gr.Image(label="Result1")
+        image_field2_80 = gr.Image(label="Result2")
+               
+        iface_80 = gr.Interface(fn=plot_from_xlsx_80, inputs=file_input_80, outputs=[text_field0_80, image_field0_80, text_field1_80, image_field1_80, text_field2_80, image_field2_80])
         # iface_80.render()
 
 if __name__ == "__main__":
     # Launch the interface
+    os.makedirs("image", exist_ok=True)
     demo.launch(server_name="0.0.0.0", server_port=7860, share=True)

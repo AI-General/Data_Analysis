@@ -12,10 +12,15 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 ```
+## Preprocessing
+```bash
+python3 preprocess.py
+```
 
 ## Regist Data
 ```bash
 python3 regist_chromadb_scaled.py
+python3 regist_rhymes.py
 ```
 This command make `DB` directory and regist from `data\DATASET_MASTER.xlsx`
 

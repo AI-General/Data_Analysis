@@ -12,26 +12,28 @@ import chromadb
 import os
 import dotenv
 
+from src.rhyme import difference_process
+from src.utils import clean_list, resample_non_drop
 
 dotenv.load_dotenv()
 
 chroma_client = chromadb.PersistentClient(path="DB")
 collection = chroma_client.get_collection(name="my_collection_scaled")
 
-dataset_df = pd.read_excel(os.getenv('DATASET_PATH'))
-print("Data loaded")
+collection_rhymes = chroma_client.get_collection(name="rhymes_8")
+
+# dataset_df = pd.read_excel(os.getenv('DATASET_PATH'))
+# print("Data loaded")
+
+dataset_df = pd.read_feather('data/dataset.feather')
 dataset_df['Datetime'] = pd.to_datetime(
     dataset_df['DATE'].astype(str) + ' ' + dataset_df['TIME'].astype(str))
 dataset_df = dataset_df.set_index('Datetime')
-
 
 def process(dataset_df, reflected_signal, id, distance, window, output_path):
     embedding = dataset_df['VALUE'][id:id+window].tolist()
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
-
-    resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
-    sample = resampled_window_reflected_signal[window:2*window]
 
     resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
     sample = resampled_window_reflected_signal[window:2*window]
@@ -140,6 +142,39 @@ def process_70(dataset_df, reflected_signal, id, distance, window, output_path):
 
     return text, output_path
 
+
+def process_rhymes(dataset_df, sample_value, id, distance, window, output_path):
+    embedding = dataset_df['VALUE'][id:id+window].tolist()
+    embedding_mean = np.mean(embedding)
+    embedding_norm = np.linalg.norm(embedding - embedding_mean)
+
+    sample = resample_non_drop(sample_value, window)
+    sample = sample - np.mean(sample)
+
+    scaled_sample = sample / \
+        np.linalg.norm(sample)*embedding_norm + embedding_mean
+
+    expand_window = int(window * 1 / 4)
+    start = max(0, id - expand_window)
+    end = min(len(dataset_df['VALUE']), id + window + expand_window)
+
+    plt.figure(figsize=(18, 6))
+    plt.plot(np.arange(start, end),
+             dataset_df['VALUE'][start:end], color='blue', label='Search Result')
+    plt.plot(np.arange(id, id+window), scaled_sample,
+             color='red', label='Recaled Sample')
+    plt.title("Most relevant search result")
+    plt.xlabel("ID")
+    plt.ylabel("Value")
+    plt.legend()
+
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(
+        dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+
+    # Saving to a temporary file and return its path
+    plt.savefig(output_path)
+    plt.close()
+    return text, output_path
 
 def plot_from_xlsx(file_path):
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
@@ -296,6 +331,48 @@ def plot_from_xlsx_70(file_path):
     return text0, path0, text1, path1, text2, path2
 
 
+def plot_from_xlsx_rhymes(file_path):
+    sample_df = pd.read_excel(file_path.name, engine='openpyxl')
+    sample_value = sample_df[sample_df.columns[1]].tolist()
+
+    clean_list(sample_value)
+    difference_list = difference_process(sample_value, window=1000, sigma=8)
+
+    results = collection_rhymes.query(
+        query_embeddings=[difference_list],
+        n_results=3
+    )
+
+    text0, path0 = process_rhymes(
+        dataset_df=dataset_df,
+        sample_value=sample_value,
+        id=int(results['metadatas'][0][0]['ID']),
+        distance=results['distances'][0][0],
+        window=results['metadatas'][0][0]['window'],
+        output_path='image/my_figure0_rhymes.png'
+    )
+
+    text1, path1 = process_rhymes(
+        dataset_df=dataset_df,
+        sample_value=sample_value,
+        id=int(results['metadatas'][0][1]['ID']),
+        distance=results['distances'][0][1],
+        window=results['metadatas'][0][1]['window'],
+        output_path='image/my_figure1_rhymes.png'
+    )
+
+    text2, path2 = process_rhymes(
+        dataset_df=dataset_df,
+        sample_value=sample_value,
+        id=int(results['metadatas'][0][2]['ID']),
+        distance=results['distances'][0][2],
+        window=results['metadatas'][0][2]['window'],
+        output_path='image/my_figure2_rhymes.png'
+    )
+
+    return text0, path0, text1, path1, text2, path2
+
+
 with gr.Blocks() as demo:
 
     with gr.Tab("Full Search"):
@@ -339,6 +416,20 @@ with gr.Blocks() as demo:
 
         iface_70 = gr.Interface(fn=plot_from_xlsx_70, inputs=file_input_70, outputs=[
                                 text_field0_70, image_field0_70, text_field1_70, image_field1_70, text_field2_70, image_field2_70])
+
+    with gr.Tab("rhymes"):
+        file_input_rhymes = gr.File(type="filepath")
+
+        text_field0_rhymes = gr.Textbox(label="Result0")
+        text_field1_rhymes = gr.Textbox(label="Result1")
+        text_field2_rhymes = gr.Textbox(label="Result2")
+
+        image_field0_rhymes = gr.Image(label="Result0")
+        image_field1_rhymes = gr.Image(label="Result1")
+        image_field2_rhymes = gr.Image(label="Result2")
+
+        iface_rhymes = gr.Interface(fn=plot_from_xlsx_rhymes, inputs=file_input_rhymes, outputs=[
+                             text_field0_rhymes, image_field0_rhymes, text_field1_rhymes, image_field1_rhymes, text_field2_rhymes, image_field2_rhymes])
 
 
 if __name__ == "__main__":

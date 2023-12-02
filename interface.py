@@ -176,6 +176,43 @@ def process_rhymes(dataset_df, sample_value, id, distance, window, output_path):
     plt.close()
     return text, output_path
 
+
+def process_rhymes_80(dataset_df, sample_value, id, distance, window, output_path):
+    embedding = dataset_df['VALUE'][id:id+window].tolist()
+    embedding_mean = np.mean(embedding)
+    embedding_norm = np.linalg.norm(embedding - embedding_mean)
+
+    sample = resample_non_drop(sample_value, int(5/4*window))
+    sample = sample - np.mean(sample[:window])
+
+    scaled_sample = sample / \
+        np.linalg.norm(sample[:window])*embedding_norm + embedding_mean
+
+    expand_window = int(window * 1 / 4)
+    start = max(0, id - expand_window)
+    end = min(len(dataset_df['VALUE']), id + int(5/4*window) + expand_window)
+
+    plt.figure(figsize=(18, 6))
+    plt.plot(np.arange(start, end),
+             dataset_df['VALUE'][start:end], color='blue', label='Search Result')
+    plt.plot(np.arange(id, id+window),
+             scaled_sample[:window], color='red', label='Recaled Sample')
+    plt.plot(np.arange(id+window, id+int(window * 5 / 4)),
+             scaled_sample[window:int(window * 5 / 4)], color='green', label='Recaled Sample')
+    plt.title("Most relevant search result")
+    plt.xlabel("ID")
+    plt.ylabel("Value")
+    plt.legend()
+
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(
+        dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+
+    # Saving to a temporary file and return its path
+    plt.savefig(output_path)
+    plt.close()
+    return text, output_path
+
+
 def plot_from_xlsx(file_path):
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
     sample_value = sample_df[sample_df.columns[1]].tolist()
@@ -373,6 +410,48 @@ def plot_from_xlsx_rhymes(file_path):
     return text0, path0, text1, path1, text2, path2
 
 
+def plot_from_xlsx_rhymes_80(file_path):
+    sample_df = pd.read_excel(file_path.name, engine='openpyxl')
+    sample_value = sample_df[sample_df.columns[1]].tolist()
+
+    clean_list(sample_value)
+    difference_list = difference_process(sample_value, window=1250, sigma=8)
+
+    results = collection_rhymes.query(
+        query_embeddings=[difference_list[:999]],
+        n_results=3
+    )
+
+    text0, path0 = process_rhymes_80(
+        dataset_df=dataset_df,
+        sample_value=sample_value,
+        id=int(results['metadatas'][0][0]['ID']),
+        distance=results['distances'][0][0],
+        window=results['metadatas'][0][0]['window'],
+        output_path='image/my_figure0_rhymes_80.png'
+    )
+
+    text1, path1 = process_rhymes_80(
+        dataset_df=dataset_df,
+        sample_value=sample_value,
+        id=int(results['metadatas'][0][1]['ID']),
+        distance=results['distances'][0][1],
+        window=results['metadatas'][0][1]['window'],
+        output_path='image/my_figure1_rhymes_80.png'
+    )
+
+    text2, path2 = process_rhymes_80(
+        dataset_df=dataset_df,
+        sample_value=sample_value,
+        id=int(results['metadatas'][0][2]['ID']),
+        distance=results['distances'][0][2],
+        window=results['metadatas'][0][2]['window'],
+        output_path='image/my_figure2_rhymes_80.png'
+    )
+
+    return text0, path0, text1, path1, text2, path2
+
+
 with gr.Blocks() as demo:
 
     with gr.Tab("Full Search"):
@@ -430,6 +509,20 @@ with gr.Blocks() as demo:
 
         iface_rhymes = gr.Interface(fn=plot_from_xlsx_rhymes, inputs=file_input_rhymes, outputs=[
                              text_field0_rhymes, image_field0_rhymes, text_field1_rhymes, image_field1_rhymes, text_field2_rhymes, image_field2_rhymes])
+
+    with gr.Tab("rhymes 80%"):
+        file_input_rhymes_80 = gr.File(type="filepath")
+
+        text_field0_rhymes_80 = gr.Textbox(label="Result0")
+        text_field1_rhymes_80 = gr.Textbox(label="Result1")
+        text_field2_rhymes_80 = gr.Textbox(label="Result2")
+
+        image_field0_rhymes_80 = gr.Image(label="Result0")
+        image_field1_rhymes_80 = gr.Image(label="Result1")
+        image_field2_rhymes_80 = gr.Image(label="Result2")
+
+        iface_rhymes_80 = gr.Interface(fn=plot_from_xlsx_rhymes_80, inputs=file_input_rhymes_80, outputs=[
+                                text_field0_rhymes_80, image_field0_rhymes_80, text_field1_rhymes_80, image_field1_rhymes_80, text_field2_rhymes_80, image_field2_rhymes_80])
 
 
 if __name__ == "__main__":

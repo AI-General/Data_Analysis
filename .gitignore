@@ -3,3 +3,4 @@ DB/
 __pycache__/
 
 data/*
+image/*

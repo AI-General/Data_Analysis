@@ -1,5 +1,6 @@
 .env
 DB/
+DB_rhymes/
 __pycache__/
 
 data/*

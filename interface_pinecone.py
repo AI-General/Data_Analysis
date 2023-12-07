@@ -11,6 +11,7 @@ import numpy as np
 import chromadb
 import os
 import dotenv
+import pinecone
 
 from src.rhyme import difference_process
 from src.utils import clean_list, resample_non_drop
@@ -20,8 +21,13 @@ dotenv.load_dotenv()
 chroma_client = chromadb.PersistentClient(path="DB")
 collection = chroma_client.get_collection(name="my_collection_scaled")
 
-chroma_client_rhymes = chromadb.PersistentClient(path="DB_rhymes")
-collection_rhymes = chroma_client_rhymes.get_collection(name="rhymes_8")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
+index = pinecone.Index(PINECONE_INDEX_NAME)
+# chroma_client_rhymes = chromadb.PersistentClient(path="DB_rhymes")
+# collection_rhymes = chroma_client_rhymes.get_collection(name="rhymes_8")
 
 # dataset_df = pd.read_excel(os.getenv('DATASET_PATH'))
 # print("Data loaded")
@@ -376,35 +382,34 @@ def plot_from_xlsx_rhymes(file_path):
     clean_list(sample_value)
     difference_list = difference_process(sample_value, window=1000, sigma=8)
 
-    results = collection_rhymes.query(
-        query_embeddings=[difference_list],
-        n_results=3
+    results = index.query(
+        vector=difference_list, top_k=3, include_metadata=True
     )
 
     text0, path0 = process_rhymes(
         dataset_df=dataset_df,
         sample_value=sample_value,
-        id=int(results['metadatas'][0][0]['ID']),
-        distance=results['distances'][0][0],
-        window=results['metadatas'][0][0]['window'],
+        id=int(results['matches'][0]['metadata']['ID']),
+        distance=results['matches'][0]['score'],
+        window=int(results['matches'][0]['metadata']['window']),
         output_path='image/my_figure0_rhymes.png'
     )
 
     text1, path1 = process_rhymes(
         dataset_df=dataset_df,
         sample_value=sample_value,
-        id=int(results['metadatas'][0][1]['ID']),
-        distance=results['distances'][0][1],
-        window=results['metadatas'][0][1]['window'],
+        id=int(results['matches'][1]['metadata']['ID']),
+        distance=results['matches'][1]['score'],
+        window=int(results['matches'][1]['metadata']['window']),
         output_path='image/my_figure1_rhymes.png'
     )
 
     text2, path2 = process_rhymes(
         dataset_df=dataset_df,
         sample_value=sample_value,
-        id=int(results['metadatas'][0][2]['ID']),
-        distance=results['distances'][0][2],
-        window=results['metadatas'][0][2]['window'],
+        id=int(results['matches'][2]['metadata']['ID']),
+        distance=results['matches'][2]['score'],
+        window=int(results['matches'][2]['metadata']['window']),
         output_path='image/my_figure2_rhymes.png'
     )
 
@@ -418,35 +423,34 @@ def plot_from_xlsx_rhymes_80(file_path):
     clean_list(sample_value)
     difference_list = difference_process(sample_value, window=1250, sigma=8)
 
-    results = collection_rhymes.query(
-        query_embeddings=[difference_list[:999]],
-        n_results=3
+    results = index.query(
+        vector=difference_list[:999], top_k=3, include_metadata=True
     )
-
+    
     text0, path0 = process_rhymes_80(
         dataset_df=dataset_df,
         sample_value=sample_value,
-        id=int(results['metadatas'][0][0]['ID']),
-        distance=results['distances'][0][0],
-        window=results['metadatas'][0][0]['window'],
+        id=int(results['matches'][0]['metadata']['ID']),
+        distance=results['matches'][0]['score'],
+        window=int(results['matches'][0]['metadata']['window']),
         output_path='image/my_figure0_rhymes_80.png'
     )
 
     text1, path1 = process_rhymes_80(
         dataset_df=dataset_df,
         sample_value=sample_value,
-        id=int(results['metadatas'][0][1]['ID']),
-        distance=results['distances'][0][1],
-        window=results['metadatas'][0][1]['window'],
+        id=int(results['matches'][1]['metadata']['ID']),
+        distance=results['matches'][1]['score'],
+        window=int(results['matches'][1]['metadata']['window']),
         output_path='image/my_figure1_rhymes_80.png'
     )
 
     text2, path2 = process_rhymes_80(
         dataset_df=dataset_df,
         sample_value=sample_value,
-        id=int(results['metadatas'][0][2]['ID']),
-        distance=results['distances'][0][2],
-        window=results['metadatas'][0][2]['window'],
+        id=int(results['matches'][2]['metadata']['ID']),
+        distance=results['matches'][2]['score'],
+        window=int(results['matches'][2]['metadata']['window']),
         output_path='image/my_figure2_rhymes_80.png'
     )
 

@@ -3,14 +3,10 @@ import sys
 
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
-import itertools
-import os
 import dotenv
 import pandas as pd
 import chromadb 
 import numpy as np
-from scipy.signal import resample
-import seaborn as sns
 from tqdm import tqdm
 import uuid
 
@@ -64,7 +60,7 @@ def upsert_vectors_k(collection, df, batch_size=100, window=1000, divide=16):
             metadatas=[v['metadata'] for v in vectors_chunk]
         )
 
-window = 1000
+window = 500
 divide = 16
 
 while window < len(dataset_df):

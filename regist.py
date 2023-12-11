@@ -1,61 +1,65 @@
 import itertools
 import os
+import uuid
 import dotenv
 import pandas as pd
 import pinecone
 from tqdm import tqdm
 
-dotenv.load_dotenv()
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
-# Read the Excel file
-pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
+from src.parallel import chunks
+from src.utils import resample_normalize
 
+dotenv.load_dotenv()
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY_FULL")
+PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT_FULL")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME_FULL")
+
+
+pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
 try:
     pinecone.delete_index(PINECONE_INDEX_NAME)
 except Exception as e:
     print(e)
-pinecone.create_index(PINECONE_INDEX_NAME, dimension=1000, pod_type='s1')
+pinecone.create_index(PINECONE_INDEX_NAME, dimension=1000, metric="cosine")
 pinecone.describe_index(PINECONE_INDEX_NAME)
-    
-df = pd.read_excel('data/DATASET_MASTER.xlsx')
-
-# Print the length of the 'VALUE' column
-print(len(df['VALUE']))
-
-# values = [df['VALUE'][i:i+1000].tolist() for i in range(len(df['VALUE']) - 1000)]
-# values = [np.array(df['VALUE'][i:i+1000].tolist()) for i in range(len(df['VALUE']) - 1000)]
-# means = np.mean(values, axis=1)
-# std_devs = np.std(values, axis=1)
-# normalized_values = [(values[i] - means[i]) / std_devs[i] if std_devs[i] != 0 else (values[i] - means[i]) for i in range(len(df['VALUE']) - 1000)]
-
-# print("Finished calculating means and standard deviations")
-
-# data_generator = map(lambda i: {
-#     'id': str(i),
-#     'values': normalized_values[i].tolist(),
-# })
-
-data_generator = map(lambda i: {
-    'id': str(i),
-    'values': df['VALUE'][i:i+1000].tolist(),
-}, range(len(df['VALUE']) - 1000))
-
-def chunks(iterable, batch_size=100):
-    """A helper function to break an iterable into chunks of size batch_size."""
-    it = iter(iterable)
-    chunk = tuple(itertools.islice(it, batch_size))
-    while chunk:
-        yield chunk
-        chunk = tuple(itertools.islice(it, batch_size))
-# normalized_values = [(values[i] - means[i]) / std_devs[i] if std_devs[i] != 0 else (values[i] - means[i]) for i in range(len(df['VALUE']) - 1000)]
-
-# vectors = [{
-#     'id': str(i), 
-#     'values': normalized_values[i].tolist(),
-#     } for i in range(len(df['VALUE']) - 1000)]
-
+print("Collection created")
 index = pinecone.Index(PINECONE_INDEX_NAME)
-for vectors_chunk in tqdm(chunks(data_generator, batch_size=100), desc='Upserting vectors'):
-    index.upsert(vectors=vectors_chunk)
+    
+dataset_df = pd.read_feather('data/dataset.feather')
+#####################################################################################################################
+# Functions
+#####################################################################################################################
+def upsert_vectors(index, df, batch_size=100, window=1000, divide=16):
+    step = int(window // divide)
+    data_generator = map(lambda i: {
+        'id': str(uuid.uuid4()),
+        'values': resample_normalize(df['VALUE'][i:i+window].tolist(), 1000),
+        'metadata': {
+            'ID': int(df['ID'][i]),
+            'date': str(df['DATE'][i]),
+            'time': str(df['TIME'][i]),
+            'window': window
+        }
+    }, range(0, len(df['VALUE']) - window, step)) # len(df['VALUE'])
+
+    for vectors_chunk in tqdm(chunks(data_generator, batch_size=batch_size), desc=f'Upserting vectors, window: {window}'):
+        index.upsert(vectors=vectors_chunk)
+
+#####################################################################################################################
+# Upsert
+#####################################################################################################################
+window = 500
+divide = 16
+upsert_vectors(index, dataset_df, batch_size=100, window=int(window*5/4), divide=divide)
+upsert_vectors(index, dataset_df, batch_size=100, window=int(window*6/4), divide=divide)
+upsert_vectors(index, dataset_df, batch_size=100, window=int(window*7/4), divide=divide)
+
+window = 1000
+while window < len(dataset_df):
+    upsert_vectors(index, dataset_df, batch_size=100, window=int(window), divide=divide)
+    upsert_vectors(index, dataset_df, batch_size=100, window=int(window*5/4), divide=divide)
+    upsert_vectors(index, dataset_df, batch_size=100, window=int(window*6/4), divide=divide)
+    upsert_vectors(index, dataset_df, batch_size=100, window=int(window*7/4), divide=divide)
+    window *= 2
+
+print("Collection upserted")

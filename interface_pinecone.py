@@ -8,44 +8,28 @@ import matplotlib.pyplot as plt
 import gradio as gr
 import pandas as pd
 import numpy as np
-import chromadb
 import os
 import dotenv
 import pinecone
 
 from src.rhyme import difference_process
-from src.utils import clean_list, resample_non_drop
+from src.search import detail_search
+from src.utils import clean_list, resample_non_drop, resample_normalize
 
 dotenv.load_dotenv()
 
-chroma_client = chromadb.PersistentClient(path="DB")
-collection = chroma_client.get_collection(name="my_collection_scaled")
-
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
-pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
-index = pinecone.Index(PINECONE_INDEX_NAME)
-# chroma_client_rhymes = chromadb.PersistentClient(path="DB_rhymes")
-# collection_rhymes = chroma_client_rhymes.get_collection(name="rhymes_8")
-
-# dataset_df = pd.read_excel(os.getenv('DATASET_PATH'))
-# print("Data loaded")
+TOP_K = 3
 
 dataset_df = pd.read_feather('data/dataset.feather')
-dataset_df['Datetime'] = pd.to_datetime(
-    dataset_df['DATE'].astype(str) + ' ' + dataset_df['TIME'].astype(str))
-dataset_df = dataset_df.set_index('Datetime')
 
-def process(dataset_df, reflected_signal, id, distance, window, output_path):
+
+def process(dataset_df, sample_value, id, distance, window, output_path):
     embedding = dataset_df['VALUE'][id:id+window].tolist()
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
 
-    resampled_window_reflected_signal = resample(reflected_signal, 3 * window)
-    sample = resampled_window_reflected_signal[window:2*window]
-    sample = sample - np.mean(sample)
-
+    sample = resample_normalize(sample_value, window)
+    
     scaled_sample = sample / \
         np.linalg.norm(sample)*embedding_norm + embedding_mean
 
@@ -62,8 +46,7 @@ def process(dataset_df, reflected_signal, id, distance, window, output_path):
     plt.ylabel("Value")
     plt.legend()
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(
-        dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
 
     # Saving to a temporary file and return its path
     plt.savefig(output_path)
@@ -71,15 +54,16 @@ def process(dataset_df, reflected_signal, id, distance, window, output_path):
     return text, output_path
 
 
-def process_80(dataset_df, reflected_signal, id, distance, window, output_path):
+def process_80(dataset_df, sample_value, id, distance, window, output_path):
     embedding = dataset_df['VALUE'][id:id+window].tolist()
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
 
-    resampled_window_reflected_signal = resample(
-        reflected_signal, 3*int(5/4*window))
-    sample = resampled_window_reflected_signal[int(
-        5*window/4): 2*int(5*window/4)]
+    # resampled_window_reflected_signal = resample(
+    #     reflected_signal, 3*int(5/4*window))
+    # sample = resampled_window_reflected_signal[int(
+    #     5*window/4): 2*int(5*window/4)]
+    sample = resample_non_drop(sample_value, int(5/4*window))
 
     sample = sample - np.mean(sample[:window])
     scaled_sample = sample / \
@@ -100,8 +84,7 @@ def process_80(dataset_df, reflected_signal, id, distance, window, output_path):
     plt.ylabel("Value")
     plt.legend()
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(
-        dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
 
     plt.savefig(output_path)
     plt.close()
@@ -109,15 +92,16 @@ def process_80(dataset_df, reflected_signal, id, distance, window, output_path):
     return text, output_path
 
 
-def process_70(dataset_df, reflected_signal, id, distance, window, output_path):
+def process_70(dataset_df, sample_value, id, distance, window, output_path):
     embedding = dataset_df['VALUE'][id:id+window].tolist()
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
 
-    resampled_window_reflected_signal = resample(
-        reflected_signal, 3*int(10/7*window))
-    sample = resampled_window_reflected_signal[int(
-        10/7*window): 2*int(10/7*window)]
+    # resampled_window_reflected_signal = resample(
+    #     reflected_signal, 3*int(10/7*window))
+    # sample = resampled_window_reflected_signal[int(
+    #     10/7*window): 2*int(10/7*window)]
+    sample = resample_non_drop(sample_value, int(10/7*window))
 
     sample = sample - \
         np.mean(sample[int(3/14*window): int(3/14*window) + window])
@@ -141,8 +125,7 @@ def process_70(dataset_df, reflected_signal, id, distance, window, output_path):
     plt.ylabel("Value")
     plt.legend()
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(
-        dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
 
     plt.savefig(output_path)
     plt.close()
@@ -175,8 +158,7 @@ def process_rhymes(dataset_df, sample_value, id, distance, window, output_path):
     plt.ylabel("Value")
     plt.legend()
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(
-        dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
 
     # Saving to a temporary file and return its path
     plt.savefig(output_path)
@@ -211,8 +193,7 @@ def process_rhymes_80(dataset_df, sample_value, id, distance, window, output_pat
     plt.ylabel("Value")
     plt.legend()
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + str(
-        dataset_df.index[id]) + "\nEnd Datetime: " + str(dataset_df.index[id+window])
+    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
 
     # Saving to a temporary file and return its path
     plt.savefig(output_path)
@@ -221,6 +202,12 @@ def process_rhymes_80(dataset_df, sample_value, id, distance, window, output_pat
 
 
 def plot_from_xlsx(file_path):
+    PINECONE_API_KEY_FULL = os.getenv("PINECONE_API_KEY_FULL")
+    PINECONE_ENVIRONMENT_FULL = os.getenv("PINECONE_ENVIRONMENT_FULL")
+    PINECONE_INDEX_NAME_FULL = os.getenv("PINECONE_INDEX_NAME_FULL")
+    pinecone.init(api_key=PINECONE_API_KEY_FULL, environment=PINECONE_ENVIRONMENT_FULL)
+    index = pinecone.Index(PINECONE_INDEX_NAME_FULL)
+    
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
@@ -231,47 +218,53 @@ def plot_from_xlsx(file_path):
         if np.isnan(sample_value[i]):
             sample_value[i] = sample_value[i-1]
 
-    reflected_signal = np.concatenate(
-        (sample_value[::-1], sample_value, sample_value[::-1]))
-    resampled_reflected_signal = resample(reflected_signal, 3 * 1000)
-    sample_value_scaled = list(resampled_reflected_signal[1000:2000])
-
-    results = collection.query(
-        query_embeddings=[sample_value_scaled],
-        n_results=3
+    query_signal = resample_normalize(sample_value, 1000)
+    results = index.query(
+        vector=query_signal, top_k=TOP_K, include_metadata=True
     )
-
-    text0, path0 = process(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][0]['ID']),
-        distance=results['distances'][0][0],
-        window=results['metadatas'][0][0]['window'],
-        output_path='image/my_figure0.png'
-    )
-
-    text1, path1 = process(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][1]['ID']),
-        distance=results['distances'][0][1],
-        window=results['metadatas'][0][1]['window'],
-        output_path='image/my_figure1.png'
-    )
-
-    text2, path2 = process(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][2]['ID']),
-        distance=results['distances'][0][2],
-        window=results['metadatas'][0][2]['window'],
-        output_path='image/my_figure2.png'
-    )
-
-    return text0, path0, text1, path1, text2, path2
+    
+    normalized_sample = np.array(sample_value)
+    normalized_sample = normalized_sample - np.mean(normalized_sample)
+    
+    detail_params = []
+ 
+    for i in range(TOP_K):
+        id, window, similarity_score = detail_search(
+            df_value=dataset_df['VALUE'].tolist(),
+            normalized_sample=normalized_sample,
+            window_param=int(results['matches'][i]['metadata']['window']),
+            id_param=int(results['matches'][i]['metadata']['ID'])
+        )
+        detail_params.append({
+            'id': id,
+            'window': window,
+            'similarity_score': similarity_score
+        })
+    
+    detail_params.sort(key=lambda x: x['similarity_score'], reverse=True)
+    
+    result = []
+    for i in range(TOP_K):
+        text, path = process(
+            dataset_df=dataset_df,
+            sample_value=sample_value,
+            id=detail_params[i]['id'],
+            distance=detail_params[i]['similarity_score'],
+            window=detail_params[i]['window'],
+            output_path=f'image/my_figure{i}.png'
+        )
+        result.append(text)
+        result.append(path)
+    return result
 
 
 def plot_from_xlsx_80(file_path):
+    PINECONE_API_KEY_FULL = os.getenv("PINECONE_API_KEY_FULL")
+    PINECONE_ENVIRONMENT_FULL = os.getenv("PINECONE_ENVIRONMENT_FULL")
+    PINECONE_INDEX_NAME_FULL = os.getenv("PINECONE_INDEX_NAME_FULL")
+    pinecone.init(api_key=PINECONE_API_KEY_FULL, environment=PINECONE_ENVIRONMENT_FULL)
+    index = pinecone.Index(PINECONE_INDEX_NAME_FULL)
+    
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
@@ -282,47 +275,54 @@ def plot_from_xlsx_80(file_path):
         if np.isnan(sample_value[i]):
             sample_value[i] = sample_value[i-1]
 
-    reflected_signal = np.concatenate(
-        (sample_value[::-1], sample_value, sample_value[::-1]))
-    resampled_reflected_signal = resample(reflected_signal, 3 * 1250)
-    sample_value_scaled = list(resampled_reflected_signal[1250:2500])
+    query_signal = resample_normalize(sample_value, 1250)
 
-    results = collection.query(
-        query_embeddings=[sample_value_scaled[:1000]],
-        n_results=3
+    results = index.query(
+        vector=query_signal[:1000], top_k=TOP_K, include_metadata=True
     )
-
-    text0, path0 = process_80(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][0]['ID']),
-        distance=results['distances'][0][0],
-        window=results['metadatas'][0][0]['window'],
-        output_path='image/my_figure0_80.png'
-    )
-
-    text1, path1 = process_80(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][1]['ID']),
-        distance=results['distances'][0][1],
-        window=results['metadatas'][0][1]['window'],
-        output_path='image/my_figure1_80.png'
-    )
-
-    text2, path2 = process_80(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][2]['ID']),
-        distance=results['distances'][0][2],
-        window=results['metadatas'][0][2]['window'],
-        output_path='image/my_figure2_80.png'
-    )
-
-    return text0, path0, text1, path1, text2, path2
+    
+    normalized_sample = np.array(sample_value[:int(len(sample_value)*4/5)])
+    normalized_sample = normalized_sample - np.mean(normalized_sample)
+    
+    detail_params = []
+    
+    for i in range(TOP_K):
+        id, window, similarity_score = detail_search(
+            df_value=dataset_df['VALUE'].tolist(),
+            normalized_sample=normalized_sample,
+            window_param=int(results['matches'][i]['metadata']['window']),
+            id_param=int(results['matches'][i]['metadata']['ID'])
+        )
+        detail_params.append({
+            'id': id,
+            'window': window,
+            'similarity_score': similarity_score
+        })
+    
+    detail_params.sort(key=lambda x: x['similarity_score'], reverse=True)
+    
+    result = []
+    for i in range(TOP_K):
+        text, path = process_80(
+            dataset_df=dataset_df,
+            sample_value=sample_value,
+            id=detail_params[i]['id'],
+            distance=detail_params[i]['similarity_score'],
+            window=detail_params[i]['window'],
+            output_path=f'image/my_figure{i}_80.png'
+        )
+        result.append(text)
+        result.append(path)
+    return result
 
 
 def plot_from_xlsx_70(file_path):
+    PINECONE_API_KEY_FULL = os.getenv("PINECONE_API_KEY_FULL")
+    PINECONE_ENVIRONMENT_FULL = os.getenv("PINECONE_ENVIRONMENT_FULL")
+    PINECONE_INDEX_NAME_FULL = os.getenv("PINECONE_INDEX_NAME_FULL")
+    pinecone.init(api_key=PINECONE_API_KEY_FULL, environment=PINECONE_ENVIRONMENT_FULL)
+    index = pinecone.Index(PINECONE_INDEX_NAME_FULL)
+    
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
@@ -333,49 +333,52 @@ def plot_from_xlsx_70(file_path):
         if np.isnan(sample_value[i]):
             sample_value[i] = sample_value[i-1]
 
-    reflected_signal = np.concatenate(
-        (sample_value[::-1], sample_value, sample_value[::-1]))
-    resampled_reflected_signal = resample(reflected_signal, 3 * int(10/7*1000))
-    sample_value_scaled = list(
-        resampled_reflected_signal[int(10/7*1000):2*int(10/7*1000)])
-
-    results = collection.query(
-        query_embeddings=[
-            sample_value_scaled[int(3/14*1000):int(3/14*1000)+1000]],
-        n_results=3
+    query_signal = resample_normalize(sample_value, int(10000/7))
+    results = index.query(
+        vector = query_signal[int(3/14*1000):int(3/14*1000)+1000], top_k=TOP_K, include_metadata=True
     )
-
-    text0, path0 = process_70(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][0]['ID']),
-        distance=results['distances'][0][0],
-        window=results['metadatas'][0][0]['window'],
-        output_path='image/my_figure0_70.png'
-    )
-
-    text1, path1 = process_70(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][1]['ID']),
-        distance=results['distances'][0][1],
-        window=results['metadatas'][0][1]['window'],
-        output_path='image/my_figure1_70.png'
-    )
-
-    text2, path2 = process_70(
-        dataset_df=dataset_df,
-        reflected_signal=reflected_signal,
-        id=int(results['metadatas'][0][2]['ID']),
-        distance=results['distances'][0][2],
-        window=results['metadatas'][0][2]['window'],
-        output_path='image/my_figure2_70.png'
-    )
-
-    return text0, path0, text1, path1, text2, path2
+  
+    normalized_sample = np.array(sample_value[int(3/14*len(sample_value)): - int(3/14*len(sample_value))])
+    normalized_sample = normalized_sample - np.mean(normalized_sample)
+    
+    detail_params = []
+    
+    for i in range(TOP_K):
+        id, window, similarity_score = detail_search(
+            df_value=dataset_df['VALUE'].tolist(),
+            normalized_sample=normalized_sample,
+            window_param=int(results['matches'][i]['metadata']['window']),
+            id_param=int(results['matches'][i]['metadata']['ID'])
+        )
+        detail_params.append({
+            'id': id,
+            'window': window,
+            'similarity_score': similarity_score
+        })
+    
+    detail_params.sort(key=lambda x: x['similarity_score'], reverse=True)
+    
+    result = []
+    for i in range(TOP_K):
+        text, path = process_70(
+            dataset_df=dataset_df,
+            sample_value=sample_value,
+            id=detail_params[i]['id'],
+            distance=detail_params[i]['similarity_score'],
+            window=detail_params[i]['window'],
+            output_path=f'image/my_figure{i}_70.png'
+        )
+        result.append(text)
+        result.append(path)
+    return result
 
 
 def plot_from_xlsx_rhymes(file_path):
+    PINECONE_API_KEY_RHYMES = os.getenv("PINECONE_API_KEY_RHYMES")
+    PINECONE_ENVIRONMENT_RHYMES = os.getenv("PINECONE_ENVIRONMENT_RHYMES")
+    PINECONE_INDEX_NAME_RHYMES = os.getenv("PINECONE_INDEX_NAME_RHYMES")
+    pinecone.init(api_key=PINECONE_API_KEY_RHYMES, environment=PINECONE_ENVIRONMENT_RHYMES)
+    index = pinecone.Index(PINECONE_INDEX_NAME_RHYMES)
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
@@ -383,7 +386,7 @@ def plot_from_xlsx_rhymes(file_path):
     difference_list = difference_process(sample_value, window=1000, sigma=8)
 
     results = index.query(
-        vector=difference_list, top_k=3, include_metadata=True
+        vector=difference_list, top_k=TOP_K, include_metadata=True
     )
 
     text0, path0 = process_rhymes(
@@ -417,6 +420,11 @@ def plot_from_xlsx_rhymes(file_path):
 
 
 def plot_from_xlsx_rhymes_80(file_path):
+    PINECONE_API_KEY_RHYMES = os.getenv("PINECONE_API_KEY_RHYMES")
+    PINECONE_ENVIRONMENT_RHYMES = os.getenv("PINECONE_ENVIRONMENT_RHYMES")
+    PINECONE_INDEX_NAME_RHYMES = os.getenv("PINECONE_INDEX_NAME_RHYMES")
+    pinecone.init(api_key=PINECONE_API_KEY_RHYMES, environment=PINECONE_ENVIRONMENT_RHYMES)
+    index = pinecone.Index(PINECONE_INDEX_NAME_RHYMES)
     sample_df = pd.read_excel(file_path.name, engine='openpyxl')
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
@@ -424,7 +432,7 @@ def plot_from_xlsx_rhymes_80(file_path):
     difference_list = difference_process(sample_value, window=1250, sigma=8)
 
     results = index.query(
-        vector=difference_list[:999], top_k=3, include_metadata=True
+        vector=difference_list[:999], top_k=TOP_K, include_metadata=True
     )
     
     text0, path0 = process_rhymes_80(

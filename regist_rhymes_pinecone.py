@@ -15,16 +15,15 @@ from src.parallel import chunks
 from src.rhyme import difference_process
 
 dotenv.load_dotenv()
-COLLECTION_NAME = "rhymes_8"
 
 dataset_df = pd.read_feather('data/dataset.feather')
 
 #####################################################################################################################
 # Create collection
 #####################################################################################################################
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY_RHYMES")
+PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT_RHYMES")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME_RHYMES")
 # Read the Excel file
 pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENVIRONMENT)
 

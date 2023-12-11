@@ -16,4 +16,7 @@ def resample_non_drop(x, n):
     resampled_reflected_signal = resample(reflected_signal, 3 * n)
     resampled_signal = resampled_reflected_signal[n:2*n].tolist()
     return resampled_signal
- 
+
+def resample_normalize(x, n):
+    resampled_signal = resample_non_drop(x, n)
+    return (resampled_signal - np.mean(resampled_signal)).tolist()

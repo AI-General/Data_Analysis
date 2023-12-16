@@ -12,7 +12,7 @@ import pinecone
 import uuid
 
 from src.parallel import chunks
-from src.rhyme import difference_process
+from src.rhyme import difference_process, savgol_normalize
 
 dotenv.load_dotenv()
 
@@ -31,21 +31,33 @@ try:
     pinecone.delete_index(PINECONE_INDEX_NAME)
 except Exception as e:
     print(e)
-pinecone.create_index(PINECONE_INDEX_NAME, dimension=999, metric='euclidean')
+pinecone.create_index(PINECONE_INDEX_NAME, dimension=1000, metric='cosine')
 pinecone.describe_index(PINECONE_INDEX_NAME)
 
 print("Collection created")
 
 index = pinecone.Index(PINECONE_INDEX_NAME)
-index.upsert
 #####################################################################################################################
 # Functions
 #####################################################################################################################
+# def upsert_vectors_rhymes(index, df, batch_size=100, window=1000, divide=16, sigma=8):
+#     step = int(window // divide)
+#     data_generator = map(lambda i: {
+#         'id': str(uuid.uuid4()),
+#         'values': difference_process(df['VALUE'][i:i+window].tolist(), 1000, sigma=sigma),
+#         'metadata': {
+#             'ID': int(df['ID'][i]),
+#             'date': str(df['DATE'][i]),
+#             'time': str(df['TIME'][i]),
+#             'window': window
+#         }
+#     }, range(0, len(df['VALUE']) - window, step)) # len(df['VALUE'])
+
 def upsert_vectors_rhymes(index, df, batch_size=100, window=1000, divide=16, sigma=8):
     step = int(window // divide)
     data_generator = map(lambda i: {
         'id': str(uuid.uuid4()),
-        'values': difference_process(df['VALUE'][i:i+window].tolist(), 1000, sigma=sigma),
+        'values': savgol_normalize(df['VALUE'][i:i+window].tolist(), 1000),
         'metadata': {
             'ID': int(df['ID'][i]),
             'date': str(df['DATE'][i]),

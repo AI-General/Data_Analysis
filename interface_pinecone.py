@@ -12,7 +12,7 @@ import os
 import dotenv
 import pinecone
 
-from src.rhyme import difference_process
+from src.rhyme import difference_process, savgol_normalize
 from src.search import detail_search
 from src.utils import clean_list, resample_non_drop, resample_normalize
 
@@ -383,7 +383,7 @@ def plot_from_xlsx_rhymes(file_path):
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
     clean_list(sample_value)
-    difference_list = difference_process(sample_value, window=1000, sigma=8)
+    difference_list = savgol_normalize(sample_value, window=1000)
 
     results = index.query(
         vector=difference_list, top_k=TOP_K, include_metadata=True
@@ -429,10 +429,10 @@ def plot_from_xlsx_rhymes_80(file_path):
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
     clean_list(sample_value)
-    difference_list = difference_process(sample_value, window=1250, sigma=8)
+    difference_list = savgol_normalize(sample_value, window=1250)
 
     results = index.query(
-        vector=difference_list[:999], top_k=TOP_K, include_metadata=True
+        vector=difference_list[:1000], top_k=TOP_K, include_metadata=True
     )
     
     text0, path0 = process_rhymes_80(

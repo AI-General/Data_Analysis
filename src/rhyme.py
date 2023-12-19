@@ -14,3 +14,7 @@ def difference_process(x, window=1000, sigma=8):
 def savgol_normalize(x, window=1000):
     filtered_data = savgol_filter(resample_non_drop(x, window), window_length=20, polyorder=3)
     return (filtered_data - np.mean(filtered_data)).tolist()
+
+def gaussian_normalize(x, window=1000, sigma=8):
+    filtered_data = gaussian_filter1d(resample_non_drop(x, window), sigma)
+    return (filtered_data - np.mean(filtered_data)).tolist()

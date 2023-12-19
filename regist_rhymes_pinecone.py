@@ -12,7 +12,7 @@ import pinecone
 import uuid
 
 from src.parallel import chunks
-from src.rhyme import difference_process, savgol_normalize
+from src.rhyme import difference_process, savgol_normalize, gaussian_normalize
 
 dotenv.load_dotenv()
 
@@ -40,24 +40,11 @@ index = pinecone.Index(PINECONE_INDEX_NAME)
 #####################################################################################################################
 # Functions
 #####################################################################################################################
-# def upsert_vectors_rhymes(index, df, batch_size=100, window=1000, divide=16, sigma=8):
-#     step = int(window // divide)
-#     data_generator = map(lambda i: {
-#         'id': str(uuid.uuid4()),
-#         'values': difference_process(df['VALUE'][i:i+window].tolist(), 1000, sigma=sigma),
-#         'metadata': {
-#             'ID': int(df['ID'][i]),
-#             'date': str(df['DATE'][i]),
-#             'time': str(df['TIME'][i]),
-#             'window': window
-#         }
-#     }, range(0, len(df['VALUE']) - window, step)) # len(df['VALUE'])
-
 def upsert_vectors_rhymes(index, df, batch_size=100, window=1000, divide=16, sigma=8):
     step = int(window // divide)
     data_generator = map(lambda i: {
         'id': str(uuid.uuid4()),
-        'values': savgol_normalize(df['VALUE'][i:i+window].tolist(), 1000),
+        'values': gaussian_normalize(df['VALUE'][i:i+window].tolist(), window=1000, sigma=sigma),
         'metadata': {
             'ID': int(df['ID'][i]),
             'date': str(df['DATE'][i]),
@@ -65,6 +52,19 @@ def upsert_vectors_rhymes(index, df, batch_size=100, window=1000, divide=16, sig
             'window': window
         }
     }, range(0, len(df['VALUE']) - window, step)) # len(df['VALUE'])
+
+# def upsert_vectors_rhymes(index, df, batch_size=100, window=1000, divide=16, sigma=8):
+#     step = int(window // divide)
+#     data_generator = map(lambda i: {
+#         'id': str(uuid.uuid4()),
+#         'values': savgol_normalize(df['VALUE'][i:i+window].tolist(), 1000),
+#         'metadata': {
+#             'ID': int(df['ID'][i]),
+#             'date': str(df['DATE'][i]),
+#             'time': str(df['TIME'][i]),
+#             'window': window
+#         }
+#     }, range(0, len(df['VALUE']) - window, step)) # len(df['VALUE'])
 
     for vectors_chunk in tqdm(chunks(data_generator, batch_size=batch_size), desc=f'Upserting vectors, window: {window}'):
         index.upsert(vectors=vectors_chunk)

@@ -12,8 +12,8 @@ import os
 import dotenv
 import pinecone
 
-from src.rhyme import difference_process, gaussian_normalize, savgol_normalize
-from src.search import detail_search
+from src.rhyme import difference_process, gaussian_normalize, savgol_normalize, rhyme_func
+from src.search import detail_search, detail_rhyme_search
 from src.utils import clean_list, resample_non_drop, resample_normalize
 
 dotenv.load_dotenv()
@@ -45,8 +45,13 @@ def process(dataset_df, sample_value, id, distance, window, output_path):
     plt.xlabel("ID")
     plt.ylabel("Value")
     plt.legend()
+    plt.grid(True)
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
+    text = "Distance score: " + str(distance) + \
+        "\nStart Datetime: " + dataset_df['DATE'][id] + " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + \
+        "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S') + \
+        "\nID: " + str(id) + \
+        "\nWindow: " + str(window)
 
     # Saving to a temporary file and return its path
     plt.savefig(output_path)
@@ -83,8 +88,13 @@ def process_80(dataset_df, sample_value, id, distance, window, output_path):
     plt.xlabel("ID")
     plt.ylabel("Value")
     plt.legend()
+    plt.grid(True)
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
+    text = "Distance score: " + str(distance) + \
+        "\nStart Datetime: " + dataset_df['DATE'][id] + " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + \
+        "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S') + \
+        "\nID: " + str(id) + \
+        "\nWindow: " + str(window)
 
     plt.savefig(output_path)
     plt.close()
@@ -124,9 +134,14 @@ def process_70(dataset_df, sample_value, id, distance, window, output_path):
     plt.xlabel("ID")
     plt.ylabel("Value")
     plt.legend()
+    plt.grid(True)
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
-
+    text = "Distance score: " + str(distance) + \
+        "\nStart Datetime: " + dataset_df['DATE'][id] + " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + \
+        "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S') + \
+        "\nID: " + str(id) + \
+        "\nWindow: " + str(window)
+        
     plt.savefig(output_path)
     plt.close()
 
@@ -157,8 +172,13 @@ def process_rhymes(dataset_df, sample_value, id, distance, window, output_path):
     plt.xlabel("ID")
     plt.ylabel("Value")
     plt.legend()
+    plt.grid(True)
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
+    text = "Distance score: " + str(distance) + \
+        "\nStart Datetime: " + dataset_df['DATE'][id] + " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + \
+        "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S') + \
+        "\nID: " + str(id) + \
+        "\nWindow: " + str(window)
 
     # Saving to a temporary file and return its path
     plt.savefig(output_path)
@@ -192,8 +212,13 @@ def process_rhymes_80(dataset_df, sample_value, id, distance, window, output_pat
     plt.xlabel("ID")
     plt.ylabel("Value")
     plt.legend()
+    plt.grid(True)
 
-    text = "Distance score: " + str(distance) + "\nStart Datetime: " + dataset_df['DATE'][id]+ " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S')
+    text = "Distance score: " + str(distance) + \
+        "\nStart Datetime: " + dataset_df['DATE'][id] + " " + dataset_df['TIME'][id].strftime('%H:%M:%S') + \
+        "\nEnd Datetime: " + dataset_df['DATE'][id+window]+ " " + dataset_df['TIME'][id+window].strftime('%H:%M:%S') + \
+        "\nID: " + str(id) + \
+        "\nWindow: " + str(window)
 
     # Saving to a temporary file and return its path
     plt.savefig(output_path)
@@ -383,41 +408,72 @@ def plot_from_xlsx_rhymes(file_path):
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
     clean_list(sample_value)
-    # query_signal = savgol_normalize(sample_value, window=1000)
-    query_signal = gaussian_normalize(sample_value, window=1000, sigma=8)
+    query_signal = rhyme_func(sample_value, window=1000)
+    # query_signal = gaussian_normalize(sample_value, window=1000, sigma=8)
 
     results = index.query(
         vector=query_signal, top_k=TOP_K, include_metadata=True
     )
+ 
+    detail_params = []
+ 
+    for i in range(TOP_K):
+        id, window, similarity_score = detail_rhyme_search(
+            df_value=dataset_df['VALUE'].tolist(),
+            query_signal=query_signal,
+            window_param=int(results['matches'][i]['metadata']['window']),
+            id_param=int(results['matches'][i]['metadata']['ID'])
+        )
+        detail_params.append({
+            'id': id,
+            'window': window,
+            'similarity_score': similarity_score
+        })
+    
+    detail_params.sort(key=lambda x: x['similarity_score'], reverse=True)
 
-    text0, path0 = process_rhymes(
-        dataset_df=dataset_df,
-        sample_value=sample_value,
-        id=int(results['matches'][0]['metadata']['ID']),
-        distance=results['matches'][0]['score'],
-        window=int(results['matches'][0]['metadata']['window']),
-        output_path='image/my_figure0_rhymes.png'
-    )
+    result = []
+    for i in range(TOP_K):
+        text, path = process_rhymes(
+            dataset_df=dataset_df,
+            sample_value=sample_value,
+            id=detail_params[i]['id'],
+            distance=detail_params[i]['similarity_score'],
+            window=detail_params[i]['window'],
+            output_path=f'image/my_figure{i}_rhymes.png'
+        )
+        result.append(text)
+        result.append(path)
+    return result
 
-    text1, path1 = process_rhymes(
-        dataset_df=dataset_df,
-        sample_value=sample_value,
-        id=int(results['matches'][1]['metadata']['ID']),
-        distance=results['matches'][1]['score'],
-        window=int(results['matches'][1]['metadata']['window']),
-        output_path='image/my_figure1_rhymes.png'
-    )
+    # text0, path0 = process_rhymes(
+    #     dataset_df=dataset_df,
+    #     sample_value=sample_value,
+    #     id=detail_params[i]['id'],
+    #     distance=detail_params[i]['similarity_score'],
+    #     window=detail_params[i]['window'],
+    #     output_path='image/my_figure0_rhymes.png'
+    # )
 
-    text2, path2 = process_rhymes(
-        dataset_df=dataset_df,
-        sample_value=sample_value,
-        id=int(results['matches'][2]['metadata']['ID']),
-        distance=results['matches'][2]['score'],
-        window=int(results['matches'][2]['metadata']['window']),
-        output_path='image/my_figure2_rhymes.png'
-    )
+    # text1, path1 = process_rhymes(
+    #     dataset_df=dataset_df,
+    #     sample_value=sample_value,
+    #     id=int(results['matches'][1]['metadata']['ID']),
+    #     distance=results['matches'][1]['score'],
+    #     window=int(results['matches'][1]['metadata']['window']),
+    #     output_path='image/my_figure1_rhymes.png'
+    # )
 
-    return text0, path0, text1, path1, text2, path2
+    # text2, path2 = process_rhymes(
+    #     dataset_df=dataset_df,
+    #     sample_value=sample_value,
+    #     id=int(results['matches'][2]['metadata']['ID']),
+    #     distance=results['matches'][2]['score'],
+    #     window=int(results['matches'][2]['metadata']['window']),
+    #     output_path='image/my_figure2_rhymes.png'
+    # )
+
+    # return text0, path0, text1, path1, text2, path2
 
 
 def plot_from_xlsx_rhymes_80(file_path):
@@ -430,42 +486,43 @@ def plot_from_xlsx_rhymes_80(file_path):
     sample_value = sample_df[sample_df.columns[1]].tolist()
 
     clean_list(sample_value)
-    # query_signal = savgol_normalize(sample_value, window=1250)
-    query_signal = gaussian_normalize(sample_value, window=1250, sigma=8)  
+    query_signal = rhyme_func(sample_value, window=1250)
+    # query_signal = gaussian_normalize(sample_value, window=1250, sigma=8)  
 
     results = index.query(
         vector=query_signal[:1000], top_k=TOP_K, include_metadata=True
     )
     
-    text0, path0 = process_rhymes_80(
-        dataset_df=dataset_df,
-        sample_value=sample_value,
-        id=int(results['matches'][0]['metadata']['ID']),
-        distance=results['matches'][0]['score'],
-        window=int(results['matches'][0]['metadata']['window']),
-        output_path='image/my_figure0_rhymes_80.png'
-    )
+    detail_params = []
+ 
+    for i in range(TOP_K):
+        id, window, similarity_score = detail_rhyme_search(
+            df_value=dataset_df['VALUE'].tolist(),
+            query_signal=query_signal[:1000],
+            window_param=int(results['matches'][i]['metadata']['window']),
+            id_param=int(results['matches'][i]['metadata']['ID'])
+        )
+        detail_params.append({
+            'id': id,
+            'window': window,
+            'similarity_score': similarity_score
+        })
+    
+    detail_params.sort(key=lambda x: x['similarity_score'], reverse=True)
 
-    text1, path1 = process_rhymes_80(
-        dataset_df=dataset_df,
-        sample_value=sample_value,
-        id=int(results['matches'][1]['metadata']['ID']),
-        distance=results['matches'][1]['score'],
-        window=int(results['matches'][1]['metadata']['window']),
-        output_path='image/my_figure1_rhymes_80.png'
-    )
-
-    text2, path2 = process_rhymes_80(
-        dataset_df=dataset_df,
-        sample_value=sample_value,
-        id=int(results['matches'][2]['metadata']['ID']),
-        distance=results['matches'][2]['score'],
-        window=int(results['matches'][2]['metadata']['window']),
-        output_path='image/my_figure2_rhymes_80.png'
-    )
-
-    return text0, path0, text1, path1, text2, path2
-
+    result = []
+    for i in range(TOP_K):
+        text, path = process_rhymes_80(
+            dataset_df=dataset_df,
+            sample_value=sample_value,
+            id=detail_params[i]['id'],
+            distance=detail_params[i]['similarity_score'],
+            window=detail_params[i]['window'],
+            output_path=f'image/my_figure{i}_rhymes_80.png'
+        )
+        result.append(text)
+        result.append(path)
+    return result
 
 with gr.Blocks() as demo:
 

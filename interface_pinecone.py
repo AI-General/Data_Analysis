@@ -524,77 +524,38 @@ def plot_from_xlsx_rhymes_80(file_path):
         result.append(path)
     return result
 
+
+def search(search_type, file_path):
+    if search_type == "Full Search":
+        return plot_from_xlsx(file_path)
+    elif search_type == "80% Search":
+        return plot_from_xlsx_80(file_path)
+    elif search_type == "70% Search":
+        return plot_from_xlsx_70(file_path)
+    elif search_type == "Rhyme Search":
+        return plot_from_xlsx_rhymes(file_path)
+    elif search_type == "80% Rhyme Search":
+        return plot_from_xlsx_rhymes_80(file_path)
+
+
 with gr.Blocks() as demo:
 
-    with gr.Tab("Full Search"):
-        file_input = gr.File(type="filepath")
-
-        text_field0 = gr.Textbox(label="Result0")
-        text_field1 = gr.Textbox(label="Result1")
-        text_field2 = gr.Textbox(label="Result2")
-
-        image_field0 = gr.Image(label="Result0")
-        image_field1 = gr.Image(label="Result1")
-        image_field2 = gr.Image(label="Result2")
-
-        iface = gr.Interface(fn=plot_from_xlsx, inputs=file_input, outputs=[
-                             text_field0, image_field0, text_field1, image_field1, text_field2, image_field2])
-
-    with gr.Tab("80% Search"):
-        file_input_80 = gr.File(type="filepath")
-
-        text_field0_80 = gr.Textbox(label="Result0")
-        text_field1_80 = gr.Textbox(label="Result1")
-        text_field2_80 = gr.Textbox(label="Result2")
-
-        image_field0_80 = gr.Image(label="Result0")
-        image_field1_80 = gr.Image(label="Result1")
-        image_field2_80 = gr.Image(label="Result2")
-
-        iface_80 = gr.Interface(fn=plot_from_xlsx_80, inputs=file_input_80, outputs=[
-                                text_field0_80, image_field0_80, text_field1_80, image_field1_80, text_field2_80, image_field2_80])
-
-    with gr.Tab("70% Search"):
-        file_input_70 = gr.File(type="filepath")
-
-        text_field0_70 = gr.Textbox(label="Result0")
-        text_field1_70 = gr.Textbox(label="Result1")
-        text_field2_70 = gr.Textbox(label="Result2")
-
-        image_field0_70 = gr.Image(label="Result0")
-        image_field1_70 = gr.Image(label="Result1")
-        image_field2_70 = gr.Image(label="Result2")
-
-        iface_70 = gr.Interface(fn=plot_from_xlsx_70, inputs=file_input_70, outputs=[
-                                text_field0_70, image_field0_70, text_field1_70, image_field1_70, text_field2_70, image_field2_70])
-
-    with gr.Tab("rhymes"):
-        file_input_rhymes = gr.File(type="filepath")
-
-        text_field0_rhymes = gr.Textbox(label="Result0")
-        text_field1_rhymes = gr.Textbox(label="Result1")
-        text_field2_rhymes = gr.Textbox(label="Result2")
-
-        image_field0_rhymes = gr.Image(label="Result0")
-        image_field1_rhymes = gr.Image(label="Result1")
-        image_field2_rhymes = gr.Image(label="Result2")
-
-        iface_rhymes = gr.Interface(fn=plot_from_xlsx_rhymes, inputs=file_input_rhymes, outputs=[
-                             text_field0_rhymes, image_field0_rhymes, text_field1_rhymes, image_field1_rhymes, text_field2_rhymes, image_field2_rhymes])
-
-    with gr.Tab("rhymes 80%"):
-        file_input_rhymes_80 = gr.File(type="filepath")
-
-        text_field0_rhymes_80 = gr.Textbox(label="Result0")
-        text_field1_rhymes_80 = gr.Textbox(label="Result1")
-        text_field2_rhymes_80 = gr.Textbox(label="Result2")
-
-        image_field0_rhymes_80 = gr.Image(label="Result0")
-        image_field1_rhymes_80 = gr.Image(label="Result1")
-        image_field2_rhymes_80 = gr.Image(label="Result2")
-
-        iface_rhymes_80 = gr.Interface(fn=plot_from_xlsx_rhymes_80, inputs=file_input_rhymes_80, outputs=[
-                                text_field0_rhymes_80, image_field0_rhymes_80, text_field1_rhymes_80, image_field1_rhymes_80, text_field2_rhymes_80, image_field2_rhymes_80])
+    with gr.Tab("Search"):
+        gr.Interface(
+            fn = search,
+            inputs=[
+                gr.Radio(["Full Search", "80% Search", "70% Search", "Rhyme Search", "80% Rhyme Search"], label="Search Type"),
+                gr.File(type="filepath", label="File"),
+            ],
+            outputs=[
+                gr.Textbox(label="Result0"), 
+                gr.Image(label="Result0"),
+                gr.Textbox(label="Result1"), 
+                gr.Image(label="Result1"), 
+                gr.Textbox(label="Result2"), 
+                gr.Image(label="Result2") 
+            ],
+        )
 
 
 if __name__ == "__main__":

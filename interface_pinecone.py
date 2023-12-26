@@ -1,9 +1,3 @@
-__import__('pysqlite3')
-import sys
-
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
-from scipy.signal import resample
 import matplotlib.pyplot as plt
 import gradio as gr
 import pandas as pd
@@ -11,8 +5,9 @@ import numpy as np
 import os
 import dotenv
 import pinecone
+from statsmodels.tsa.arima.model import ARIMA
 
-from src.rhyme import difference_process, gaussian_normalize, savgol_normalize, rhyme_func
+from src.rhyme import rhyme_func
 from src.search import detail_search, detail_rhyme_search
 from src.utils import clean_list, resample_non_drop, resample_normalize
 
@@ -64,10 +59,6 @@ def process_80(dataset_df, sample_value, id, distance, window, output_path):
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
 
-    # resampled_window_reflected_signal = resample(
-    #     reflected_signal, 3*int(5/4*window))
-    # sample = resampled_window_reflected_signal[int(
-    #     5*window/4): 2*int(5*window/4)]
     sample = resample_non_drop(sample_value, int(5/4*window))
 
     sample = sample - np.mean(sample[:window])
@@ -106,11 +97,6 @@ def process_70(dataset_df, sample_value, id, distance, window, output_path):
     embedding = dataset_df['VALUE'][id:id+window].tolist()
     embedding_mean = np.mean(embedding)
     embedding_norm = np.linalg.norm(embedding - embedding_mean)
-
-    # resampled_window_reflected_signal = resample(
-    #     reflected_signal, 3*int(10/7*window))
-    # sample = resampled_window_reflected_signal[int(
-    #     10/7*window): 2*int(10/7*window)]
     sample = resample_non_drop(sample_value, int(10/7*window))
 
     sample = sample - \
@@ -446,35 +432,6 @@ def plot_from_xlsx_rhymes(file_path):
         result.append(path)
     return result
 
-    # text0, path0 = process_rhymes(
-    #     dataset_df=dataset_df,
-    #     sample_value=sample_value,
-    #     id=detail_params[i]['id'],
-    #     distance=detail_params[i]['similarity_score'],
-    #     window=detail_params[i]['window'],
-    #     output_path='image/my_figure0_rhymes.png'
-    # )
-
-    # text1, path1 = process_rhymes(
-    #     dataset_df=dataset_df,
-    #     sample_value=sample_value,
-    #     id=int(results['matches'][1]['metadata']['ID']),
-    #     distance=results['matches'][1]['score'],
-    #     window=int(results['matches'][1]['metadata']['window']),
-    #     output_path='image/my_figure1_rhymes.png'
-    # )
-
-    # text2, path2 = process_rhymes(
-    #     dataset_df=dataset_df,
-    #     sample_value=sample_value,
-    #     id=int(results['matches'][2]['metadata']['ID']),
-    #     distance=results['matches'][2]['score'],
-    #     window=int(results['matches'][2]['metadata']['window']),
-    #     output_path='image/my_figure2_rhymes.png'
-    # )
-
-    # return text0, path0, text1, path1, text2, path2
-
 
 def plot_from_xlsx_rhymes_80(file_path):
     PINECONE_API_KEY_RHYMES = os.getenv("PINECONE_API_KEY_RHYMES")
@@ -487,7 +444,6 @@ def plot_from_xlsx_rhymes_80(file_path):
 
     clean_list(sample_value)
     query_signal = rhyme_func(sample_value, window=1250)
-    # query_signal = gaussian_normalize(sample_value, window=1250, sigma=8)  
 
     results = index.query(
         vector=query_signal[:1000], top_k=TOP_K, include_metadata=True
@@ -538,6 +494,46 @@ def search(search_type, file_path):
         return plot_from_xlsx_rhymes_80(file_path)
 
 
+def arima_process(arima_type, file_path):
+    if arima_type == "Forecast":
+        return arima_forecast(file_path)
+    elif arima_type == "Test":
+        return arima_test(file_path)
+
+def arima_forecast(file_path):
+    sample_df = pd.read_excel(file_path.name, engine='openpyxl')
+    sample_value = sample_df[sample_df.columns[1]].tolist()
+    clean_list(sample_value)
+    
+    pdq = (4, 1, 2)
+    model = ARIMA(sample_value, order=pdq)
+    model_fit = model.fit()
+    forecast = model_fit.forecast(steps=int(len(sample_value)/4))
+    
+    plt.figure(figsize=(18, 6))
+    plt.plot(np.arange(0, len(sample_value)), sample_value, color='blue', label='Original')
+    plt.plot(np.arange(len(sample_value), len(sample_value)+len(forecast)), forecast, color='red', label='Forecast')
+    plt.grid(True)
+    plt.savefig('image/arima_forecast.png')
+    return "", "image/arima_forecast.png"
+
+def arima_test(file_path):
+    sample_df = pd.read_excel(file_path.name, engine='openpyxl')
+    sample_value = sample_df[sample_df.columns[1]].tolist()
+    clean_list(sample_value)
+    
+    pdq = (4, 1, 2)
+    model = ARIMA(sample_value[:len(sample_value) - int(len(sample_value)/4)], order=pdq)
+    model_fit = model.fit()
+    forecast = model_fit.forecast(steps=int(len(sample_value)/4))
+    
+    plt.figure(figsize=(18, 6))
+    plt.plot(np.arange(0, len(sample_value)), sample_value, color='blue', label='Original')
+    plt.plot(np.arange(len(sample_value)-len(forecast), len(sample_value)), forecast, color='red', label='Forecast')
+    plt.grid(True)
+    plt.savefig('image/arima_test.png')
+    return "", "image/arima_test.png"
+
 with gr.Blocks() as demo:
 
     with gr.Tab("Search"):
@@ -556,7 +552,21 @@ with gr.Blocks() as demo:
                 gr.Image(label="Result2") 
             ],
         )
+        
+    with gr.Tab("ARIMA"):
+        gr.Interface(
+            fn = arima_process,
+            inputs=[
+                gr.Radio(["Forecast", "Test"]),
+                gr.File(type="filepath", label="File"),
+            ],
+            outputs=[
+                gr.Textbox(label="Result"),
+                gr.Image(label="Result") 
+            ],
+        )
 
+        
 
 if __name__ == "__main__":
     # Launch the interface
